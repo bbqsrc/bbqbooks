@@ -6,7 +6,7 @@ Cook the books!
 Currently, it's just a little bit hacky, but it can be run like so:
 
 <pre class="console">
-$ python3 bbqbooks.py'
+$ python3 bbqbooks.py
 </pre>
 
 
