@@ -38,6 +38,10 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
         text-align: center;
   }
 
+  #contact {
+		margin-top: 0.5em;
+  }
+
   .left {
         /*float: left;*/
         display: inline-block;
@@ -51,6 +55,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
   }
   #invoicer, #invoicee {
         margin-top: 1em;
+		font-size: 10pt;
   }
 
   #regarding {
@@ -130,6 +135,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 
   .heading {
         font-weight: bold;
+		margin-top: 0.3em;
   }
 
   .number {
@@ -138,6 +144,10 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 
   #business-number {
 		margin-bottom: 1em;
+  }
+
+  #invoice-id, #invoice-date {
+		font-size: 11pt;
   }
 
   </style>
@@ -165,12 +175,12 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
           ${personal['business_number']}
         </div>
 
-        <div>
-          Invoice No: ${invoice['id']}
+        <div id="invoice-date">
+          Invoice Date: ${invoice['date']}
         </div>
 
-        <div>
-          Invoice Date: ${invoice['date']}
+        <div id="invoice-id">
+          Invoice No: ${invoice['id']}
         </div>
 
         <div id="invoicer">
@@ -316,12 +326,16 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 </%def>
 
 <%def name="lst(x)">
-	${"<br>".join(x)}
+	<%
+		if not isinstance(x, str):	
+			x = "<br>".join(x)
+	%>
+	${x}
 </%def>
 
 <%def name="num(x)">
 	<%
-		fmt = "%0.f"
+		fmt = "%.0f"
 		x = locale.format(fmt, float(x), True, False)
 	%>
 	${x}
@@ -331,7 +345,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 	<% 
 		
 		side = "right" if inv_locale['currency'].get('side') == "right" else "left"
-		fmt = inv_locale['currency'].get('format') or "%2.f"
+		fmt = inv_locale['currency'].get('format') or "%.2f"
 		x = locale.format(fmt, float(x), True, True)
 		if side == "right":
 			x = "%s%s" % (x, inv_locale['currency']['symbol'])
@@ -351,6 +365,6 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
           <div class="payment-method-heading">
             ${payment['method']}
           </div>
-          ${payment['text']}
+          ${lst(payment['text'])}
 		</div>
 </%def>

@@ -391,6 +391,10 @@ class BookTUI:
 class Book:
 	def __init__(self):
 		self.data = json.loads(default_config)
+		self.data['template_path'] = [
+			'.',
+			'templates'
+		]
 
 	def load(self, f):
 		self.data = json.load(f)
