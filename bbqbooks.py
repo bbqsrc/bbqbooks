@@ -129,9 +129,6 @@ class BookTUI:
 			data[q[1]] = res
 		return data
 
-
-
-				
 	def set_personal_details(self):
 		self.changes = True
 		def set_contact():
@@ -162,6 +159,7 @@ class BookTUI:
 						break
 				text = res.strip().split('\n')
 				payment.append({method: text})
+			return payment
 
 
 		questions = (
@@ -412,7 +410,7 @@ class Book:
 		}
 		
 	def inv_code_exists(self, inv_code):
-		return self.data['invoices'].has_key(inv_code)
+		return bool(self.data['invoices'].get(inv_code))
 	
 	def generate_invoice(self, inv_code):
 		invoices = self.data.get("invoices")

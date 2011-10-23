@@ -154,7 +154,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 		% endif
         <div id="invoicee">
           ${invoice['name']}<br>
-		  ${invoice['address']}
+		  ${lst(invoice['address'])}
         </div>
       </div>
 
@@ -179,7 +179,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
           </div>
 
           <div id="address">
-            ${personal['address']}
+            ${lst(personal['address'])}
           </div>
 
           <div id="contact">
@@ -313,6 +313,10 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
         <td class="number">${cur(item['rate_price'])}</td>
         <td class="number">${cur(float(item['rate_price']) * float(item['hours_qty']))}</td>
       </tr>
+</%def>
+
+<%def name="lst(x)">
+	${"<br>".join(x)}
 </%def>
 
 <%def name="num(x)">
