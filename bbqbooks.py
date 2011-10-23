@@ -1,12 +1,14 @@
-from mako.template import Template
 from mako.lookup import TemplateLookup
+from bz2 import compress, decompress
 from collections import OrderedDict
+from mako.template import Template
 from os.path import join as pjoin
+from io import StringIO
 
-import mako
 import json, re, sys, os
 import readline
 import types
+import mako
 
 
 __version__ = "0.2dev"
@@ -327,12 +329,12 @@ class BookTUI:
 		sel = input("> ")
 		f = None
 		try:
-			f = open(sel, 'r')
+			f = open(sel, 'rb')
 		except IOError as e:
 			try:
 				if not sel.endswith(__fileext__):
 					sel += __fileext__
-					f = open(sel, 'r')
+					f = open(sel, 'rb')
 			except:
 				print("File not found or not readable.")
 				return
@@ -354,7 +356,7 @@ class BookTUI:
 			if not sel.endswith(__fileext__):
 				sel += __fileext__
 
-		f = open(sel, 'w')
+		f = open(sel, 'wb')
 		self.book.save(f)
 		f.close()
 		self.changes = False
@@ -397,14 +399,17 @@ class Book:
 		]
 
 	def load(self, f):
-		self.data = json.load(f)
+		buf = decompress(f.read()).decode('utf-8')
+		self.data = json.loads(buf)
 		self.data['template_path'] = [
 			'.',
 			'templates'
 		]
 
 	def save(self, f):
-		json.dump(self.data, f)
+		buf = StringIO()
+		json.dump(self.data, buf)
+		f.write(compress(bytes(buf.getvalue(), 'utf-8')))
 
 	def merge_data_for_invoice(self, invoice):
 		return {
