@@ -1,14 +1,19 @@
 from mako.template import Template
 from mako.lookup import TemplateLookup
 from collections import OrderedDict
+from os.path import join as pjoin
 
 import mako
-import json, re, sys
+import json, re, sys, os
 import readline
+import types
 
-__version__ = "0.1"
+
+__version__ = "0.2dev"
 __author__ = "Brendan Molloy"
 __fileext__ = ".bbqbook"
+
+
 def yes_no_prompt(default=None):
 	prompt = ""
 	
@@ -38,12 +43,13 @@ def yes_no_prompt(default=None):
 		elif res.strip().lower() == "y":
 			return True
 
+
 class BookTUI:
 	def __init__(self):
 		self.book = None
 		self.fn = None
 		self.advanced_mode = False
-		self.changes = True
+		self.changes = False
 
 	def start(self):
 		print("bbqbooks %s" % __version__)
@@ -64,6 +70,9 @@ class BookTUI:
 		sys.exit()
 	
 	def define_menus(self):
+		def set_menu(m):
+			self.current_menu = m
+
 		def toggle_advanced():
 			self.advanced_mode = not self.advanced_mode
 			print("Advanced mode:", self.advanced_mode)
@@ -71,19 +80,104 @@ class BookTUI:
 		self.menu = (
 			('new', 'open a new book', self.new_book),
 			('load', 'load a book', self.load_book),
-			('quit', 'exit the application', self.quit)
+			('quit', 'exit the application', self.quit, 'q')
 		)
 
 		self.book_menu = (
 			('add invoice', 'adds a new invoice', self.add_invoice),
 			('output invoice', 'outputs an invoice to file', self.output_invoice),
 			('output invoices', 'outputs all invoices to directory', self.output_all_invoices),
-			#('advanced mode', 'enable/disable advanced functionality', toggle_advanced),
-			('save', 'save the current book', self.save_book),
-			('quit', 'exit the application', self.quit)
+			('personal settings', 'set your details and preferences', lambda: set_menu(self.personal_menu)),
+			('save', 'save the current book', self.save_book, 's'),
+			('quit', 'exit the application', self.quit, 'q')
+		)
+
+		self.personal_menu = (
+			('set details', 'change name, address, etc', self.set_personal_details),
+			('advanced mode', 'enable/disable advanced functionality', toggle_advanced),
+			('return to invoice menu', 'go back to invoice menu', lambda: set_menu(self.book_menu), 'r')
+
 		)
 
 		self.current_menu = self.menu
+
+	def create_dict_from_questions(self, questions, default_dict):
+		data = OrderedDict()
+		res = ""
+		for q in questions:
+			print(q[0])
+			
+			if isinstance(q[2], types.FunctionType):
+				res = q[2]()
+
+			elif q[2] is True:
+				res = ""
+				while 1:
+					last = input("> ")
+					res += last
+					if last.strip() != "":
+						res += "\n"
+					else:
+						break
+				res = res.strip().split("\n")
+
+			elif q[2] is False:
+				res = input("[%s]> " % default_dict.get(q[1], "")).strip()
+				if res == "":
+					res = default_dict.get(q[1], "")
+
+			data[q[1]] = res
+		return data
+
+
+
+				
+	def set_personal_details(self):
+		self.changes = True
+		def set_contact():
+			contacts = {}
+			while 1:
+				typ = input("Type > ").strip()
+				if typ == "":
+					break
+				acct = input("Value > ").strip()
+				contacts[typ] = acct
+			return contacts
+
+		def set_payment():
+			payment = []
+			while 1:
+				method = input("Method > ").strip()
+				if method == "":
+					break
+				
+				print("Text")
+				res = ""
+				while 1:
+					last = input("> ")
+					res += last
+					if last != "":
+						res += "\n"
+					else:
+						break
+				text = res.strip().split('\n')
+				payment.append({method: text})
+
+
+		questions = (
+			("Name", "name", False, ""),
+			("Address", "address", True, ""),
+			("Contact", "contact", set_contact, {}),
+			("Business number", "business_number", False, ""),
+			("Payment methods", "payment_methods", set_payment, []),
+			("Default template", "default_template", False, "default.tpl"),
+			("Default locale", "default_locale", False, "en_AU")#,
+			#("Logo (base64)", "logo", False, None)
+		)
+		data = self.create_dict_from_questions(questions, self.book.data['personal'])
+		self.book.data['personal'] = data
+		print("Personal data modified.")
+	
 
 	def add_invoice(self):
 		self.changes = True
@@ -140,11 +234,11 @@ class BookTUI:
 			("Payment due", "payment_due", False, ""),
 			("Already paid", "already_paid", False, 0),
 			("Reference code", "reference", False, ""),
-			("Message", "message", True, "")#,
+			("Message", "message", False, "")#,
 			#("Template", "template", True)
 			#("Locale", "locale", False)
 		)
-		data['template'] = 'template.tpl'
+		data['template'] = 'default.tpl'
 		data['locale'] = "en_AU"
 		
 		
@@ -192,11 +286,38 @@ class BookTUI:
 			print("Created new invoice number %s." % data['id'])
 	
 	def output_invoice(self):
-		pass
+		print("Enter invoice code you wish to output.")
+		res = input("> ")
+		if self.book.inv_code_exists(res.strip()):
+			inv_code = res.strip()
+
+		print("Please enter the file you wish to save the output to.")
+		res = input("> ")
+		if not res.endswith('.html'):
+			res += ".html"
+		f = None
+		try:
+			f = open(res, 'w')
+			self.book.output_invoice(inv_code, f)
+			f.close()
+		except IOError:
+			print("File not writable.")
 	
 	def output_all_invoices(self):
-		pass
-	
+		print("Please enter directory you wish to save all invoices to.")
+		res = input("> ")
+		try:
+			os.makedirs(res)
+		except OSError as e:
+			if e.errno != 17:
+				print(e)
+				return
+
+		for inv_code in self.book.data['invoices'].keys():
+			f = open(pjoin(res, inv_code + ".html"), 'w')
+			self.book.output_invoice(inv_code, f)
+			f.close()
+
 	def new_book(self):
 		self.book = Book()
 		self.current_menu = self.book_menu
@@ -230,7 +351,7 @@ class BookTUI:
 
 	def save_as_book(self, sel=None):
 		if not sel:
-			print("Enter the path you wish to save the file to")
+			print("Enter the path you wish to save the file to.")
 			sel = input("> ")
 			if not sel.endswith(__fileext__):
 				sel += __fileext__
@@ -239,28 +360,34 @@ class BookTUI:
 		self.book.save(f)
 		f.close()
 		self.changes = False
+		self.fn = sel
 		print("File %s saved." % self.fn)
 
 	def run_menu(self):
 		self.define_menus()
 		while 1:
+			c = 1
+			cmds = {}
 			print('\n---')
-			for n, item in enumerate(self.current_menu):
-				print("%2s) %16s - %s" % (n+1, item[0], item[1]))
+			for item in self.current_menu:
+				if len(item) < 4:
+					print("%2s) %16s - %s" % (c, item[0], item[1]))
+					cmds[str(c)] = item[2]
+					c += 1
+				else:
+					print("%2s) %16s - %s" % (item[3], item[0], item[1]))
+					cmds[item[3]] = item[2]
 			print()	
 			try:
-				sel = input("> ")
-				sel = int(sel)-1
-				if sel < len(self.current_menu) and sel >= 0:
-					self.current_menu[sel][2]()
+				sel = input("> ").strip()
+				if sel in cmds:
+					cmds[sel]()
 				else:
 					print("Invalid selection")
 			except (EOFError, KeyboardInterrupt):
-				sys.exit()
+				self.quit()
 			except ValueError:
 				print("Invalid selection")
-				
-
 
 
 class Book:
@@ -284,7 +411,9 @@ class Book:
 			'inv_locale': self.data['locales'][invoice['locale']]
 		}
 		
-
+	def inv_code_exists(self, inv_code):
+		return self.data['invoices'].has_key(inv_code)
+	
 	def generate_invoice(self, inv_code):
 		invoices = self.data.get("invoices")
 		if invoices is None:
@@ -301,15 +430,11 @@ class Book:
 		except:
 			print(mako.exceptions.text_error_template().render())
 
-	def output_invoice(self, inv_code, fn):
+	def output_invoice(self, inv_code, f):
 		invoice = self.generate_invoice(inv_code)
 		if invoice is not None:
-			f = open(fn, 'w')
 			f.write(invoice)
-			f.close()
-			print("%s saved." % fn)
-		else:
-			print("File not saved.")
+
 
 def test():
 	import io
@@ -318,11 +443,12 @@ def test():
 	book.output_invoice('1', "invoice-test.html")
 	book.save("./meow.json")
 
+
 default_config = r"""
 {
 	"personal": {
 		"name": "",
-		"address": "",
+		"address": [],
 		"contact": {},
 		"business_number": "",
 		"payment_methods": [],
@@ -419,7 +545,7 @@ example_config = r"""
 		"1": {
 			"id": "1",
 			"name": "Some Person",
-			"address": "Long Address<br>Some Place",
+			"address": ["Long Address", "Some Place"],
 			"date": "2011-02-02",
 			"regarding": "RE: Something Good",
 			"details": [
@@ -450,3 +576,8 @@ example_config = r"""
 	}
 }
 """
+
+if __name__ == "__main__":
+	ui = BookTUI()
+	ui.start()
+
