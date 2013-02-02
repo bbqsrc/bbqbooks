@@ -1,23 +1,26 @@
 <% 
 import locale
-locale.setlocale(locale.LC_ALL, invoice['locale'])
+locale.setlocale(locale.LC_ALL, invoice.get('their_locale', invoice['locale']))
 %>
 <!DOCTYPE html>
 <html>
 <head>
   <title>Tax Invoice &mdash; ${invoice['date']}</title>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <style type="text/css">
   html, body {
         font-family: "Myriad Pro", "Arial", sans-serif;
         background-color: gray;
-        /*padding: 0;
-        margin: 0;*/
   }
 
   p {
         padding: 0;
         margin: 0;
+  }
+
+  #invoicee {
+    margin-top: 1em;
+    font-size: 10pt;
   }
 
   #container {
@@ -43,7 +46,6 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
   }
 
   .left {
-        /*float: left;*/
         display: inline-block;
         padding: 0;
         margin: 0;
@@ -53,7 +55,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
         float: right;
         text-align: right;
   }
-  #invoicer, #invoicee {
+  #invoicer {
         margin-top: 1em;
 		font-size: 10pt;
   }
@@ -63,6 +65,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
         clear: both;
         font-weight: bold;
         margin-bottom: 1em;
+		padding-top: 3em;
   }
 
   ul#details {
@@ -82,8 +85,9 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
         border-collapse: collapse;
         border: 1px solid black;
         border-width: 1px;
-        padding-left: 2px;
-        padding-right: 2px;
+        padding: 0.1em 0.3em;
+        line-height: 18pt;
+        font-size: 12pt;
   }
 
   table#items th.desc {
@@ -102,8 +106,8 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
   }
 
   table#totals td.total {
-        padding-right: 2px;
-        border: 2px solid black;
+        padding-right: 0.2em;
+        border: 1px solid black;
   }
 
   #payment {
@@ -147,9 +151,14 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
   }
 
   #invoice-id, #invoice-date {
-		font-size: 11pt;
+		font-size: 10pt;
   }
 
+  </style>
+  <style type="text/css" media="print">
+    html, body {
+        background-color: white;
+    }
   </style>
 </head>
 
@@ -159,12 +168,17 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
   <div id="content">
     <div id="header">
       <div class="left">
-        % if personal.get("logo"):
-			<img id="logo" src="${personal['logo']}" alt="Logo" name="logo">
-		% endif
+        <div id="invoice-date">
+          Invoice Date: ${invoice['date']}
+        </div>
+
+        <div id="invoice-id">
+          Invoice No: ${invoice['id']}
+        </div>
+
         <div id="invoicee">
           ${invoice['name']}<br>
-		  ${lst(invoice['address'])}
+		  ${ljoin(invoice['address'])}
         </div>
       </div>
 
@@ -175,21 +189,13 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
           ${personal['business_number']}
         </div>
 
-        <div id="invoice-date">
-          Invoice Date: ${invoice['date']}
-        </div>
-
-        <div id="invoice-id">
-          Invoice No: ${invoice['id']}
-        </div>
-
         <div id="invoicer">
           <div id="name">
             ${personal['name']}
           </div>
 
           <div id="address">
-            ${lst(personal['address'])}
+            ${ljoin(personal['address'])}
           </div>
 
           <div id="contact">
@@ -232,7 +238,7 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 	<div id="payment">
       <div class="left">
         <div class="heading">
-          Payment Options &mdash; Invoice Number: ${invoice['id']}
+          Payment Options
         </div>
 
       	% for method in personal['payment_methods']:
@@ -247,7 +253,8 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 			tax = 0.0
 			
 			for item in invoice['items']:
-				total_excl_tax += float(item['hours_qty']) * float(item['rate_price'])
+				rate = float(item.get('their_rate_price', item['rate_price']))
+				total_excl_tax += float(item['hours_qty']) * rate 
 				tax += float(item['tax'])
 			
 			total_incl_tax = total_excl_tax + tax
@@ -317,15 +324,16 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 </%def>
 
 <%def name="add_item(item)">
+    <% rate = item.get('their_rate_price', item['rate_price']) %>
       <tr>
         <td>${item['description']}</td>
         <td class="number">${num(item['hours_qty'])}</td>
-        <td class="number">${cur(item['rate_price'])}</td>
-        <td class="number">${cur(float(item['rate_price']) * float(item['hours_qty']))}</td>
+        <td class="number">${cur(rate)}</td>
+        <td class="number">${cur(float(rate) * float(item['hours_qty']))}</td>
       </tr>
 </%def>
 
-<%def name="lst(x)">
+<%def name="ljoin(x)">
 	<%
 		if not isinstance(x, str):	
 			x = "<br>".join(x)
@@ -361,10 +369,12 @@ locale.setlocale(locale.LC_ALL, invoice['locale'])
 </%def>
 
 <%def name="add_payment_option(payment)">
+		% for k, v in payment.items():
         <div class="payment-method">
           <div class="payment-method-heading">
-            ${payment['method']}
+            ${k}
           </div>
-          ${lst(payment['text'])}
+          ${ljoin(v)}
+		% endfor
 		</div>
 </%def>
